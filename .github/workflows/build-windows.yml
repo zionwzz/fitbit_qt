@@ -19,46 +19,49 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Upgrade pip
-        run: python -m pip install --upgrade pip
+      - name: Create virtual environment
+        shell: pwsh
+        run: |
+          python -m venv .venv
 
-      - name: Install dependencies
-        run: pip install -r requirements.txt
+      - name: Install dependencies in venv
+        shell: pwsh
+        run: |
+          .\.venv\Scripts\python -m pip install --upgrade pip
+          .\.venv\Scripts\python -m pip install -r requirements.txt
 
-      - name: Verify app starts imports cleanly
-        run: python -c "import main; print('main import ok')"
+      - name: Verify imports
+        shell: pwsh
+        run: |
+          .\.venv\Scripts\python -c "import main; print('main import ok')"
 
       - name: Initialize deploy spec if missing
         shell: pwsh
         run: |
           if (-Not (Test-Path "pysidedeploy.spec")) {
-            pyside6-deploy main.py --init
+            .\.venv\Scripts\pyside6-deploy.exe main.py --init
           }
 
       - name: Build Windows package
-        run: pyside6-deploy main.py
+        shell: pwsh
+        run: |
+          .\.venv\Scripts\pyside6-deploy.exe main.py
 
       - name: Show output tree
         shell: pwsh
         run: |
-          Get-ChildItem -Recurse -Depth 3
+          Get-ChildItem -Recurse -Depth 4
 
       - name: Zip build output
         shell: pwsh
         run: |
-          $candidates = @(
-            "deployment",
-            "dist",
-            ".\deployment",
-            ".\dist"
-          ) | Where-Object { Test-Path $_ }
-
-          if ($candidates.Count -eq 0) {
-            throw "Could not find build output folder. Check the 'Show output tree' step to see where pyside6-deploy wrote files."
+          $app = Get-ChildItem -Recurse -Filter *.exe | Where-Object { $_.FullName -notmatch "\\.venv\\" } | Select-Object -First 1
+          if (-not $app) {
+            throw "No packaged .exe found."
           }
 
-          $outDir = $candidates[0]
-          Compress-Archive -Path "$outDir\*" -DestinationPath "fitbit_qt-windows.zip" -Force
+          $folder = Split-Path $app.FullName -Parent
+          Compress-Archive -Path "$folder\*" -DestinationPath "fitbit_qt-windows.zip" -Force
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
