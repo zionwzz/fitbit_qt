@@ -3,14 +3,21 @@ name: Build macOS app (unsigned)
 on:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   build-macos:
     runs-on: macos-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
 
-      - uses: actions/setup-python@v5
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
@@ -36,7 +43,6 @@ jobs:
             echo "No .app bundle found"
             exit 1
           fi
-
           echo "Found app at: $APP_PATH"
           ditto -c -k --sequesterRsrc --keepParent "$APP_PATH" fitbit_qt-macos.zip
 
