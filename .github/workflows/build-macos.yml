@@ -1,4 +1,4 @@
-name: Build macOS app
+name: Build macOS app (unsigned)
 
 on:
   workflow_dispatch:
@@ -26,12 +26,12 @@ jobs:
       - name: Show generated files
         shell: bash
         run: |
-          find . -maxdepth 3 | sort
+          find . -maxdepth 4 | sort
 
       - name: Find app bundle and zip it
         shell: bash
         run: |
-          APP_PATH="$(find . -name '*.app' -maxdepth 3 | head -n 1)"
+          APP_PATH="$(find . -name '*.app' -maxdepth 4 | head -n 1)"
           if [ -z "$APP_PATH" ]; then
             echo "No .app bundle found"
             exit 1
