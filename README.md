@@ -63,7 +63,7 @@ The app currently supports:
 ## Notes
 
 - The app runs locally on your computer
-- No Streamlit server is used
+- No outside server is used
 - The UI is a native desktop app built with Qt
 - macOS and Windows builds are released separately
 
