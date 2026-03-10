@@ -1027,3 +1027,8 @@ def _sanitize_filename_part(s: str) -> str:
     s = re.sub(r"\s+", "_", s)
     s = re.sub(r"[^A-Za-z0-9_\-]+", "", s)
     return s or "UNKNOWN"
+
+def sanitize_filename_part(s: str) -> str:
+    s = (s or "").strip()
+    s = re.sub(r"[^A-Za-z0-9._-]+", "_", s)
+    return s or "participant"
