@@ -1,0 +1,47 @@
+name: Build macOS app
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-macos:
+    runs-on: macos-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Build in venv
+        shell: bash
+        run: |
+          python -m venv .venv
+          source .venv/bin/activate
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+          pyside6-deploy -f
+
+      - name: Show generated files
+        shell: bash
+        run: |
+          find . -maxdepth 3 | sort
+
+      - name: Find app bundle and zip it
+        shell: bash
+        run: |
+          APP_PATH="$(find . -name '*.app' -maxdepth 3 | head -n 1)"
+          if [ -z "$APP_PATH" ]; then
+            echo "No .app bundle found"
+            exit 1
+          fi
+
+          echo "Found app at: $APP_PATH"
+          ditto -c -k --sequesterRsrc --keepParent "$APP_PATH" fitbit_qt-macos.zip
+
+      - name: Upload zipped artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: fitbit_qt-macos
+          path: fitbit_qt-macos.zip
