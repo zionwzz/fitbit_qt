@@ -23,32 +23,13 @@ jobs:
           python -m pip install -r requirements.txt
           "Yes" | pyside6-deploy -f
 
-      - name: Show all generated files
+      - name: Show deployment output
         shell: pwsh
         run: |
-          Get-ChildItem -Recurse . | Select-Object FullName
+          Get-ChildItem -Recurse deployment
 
-      - name: Find packaged exe and zip its folder
-        shell: pwsh
-        run: |
-          $exe = Get-ChildItem -Recurse -Filter *.exe |
-            Where-Object {
-              $_.FullName -notmatch "\\.venv\\" -and
-              $_.FullName -notmatch "\\Scripts\\" -and
-              $_.Name -ne "python.exe"
-            } |
-            Select-Object -First 1
-
-          if (-not $exe) {
-            throw "No packaged .exe found anywhere in the workspace."
-          }
-
-          Write-Host "Found packaged exe at: $($exe.FullName)"
-          $folder = Split-Path $exe.FullName -Parent
-          Compress-Archive -Path "$folder\*" -DestinationPath "fitbit_qt-windows.zip" -Force
-
-      - name: Upload artifact
+      - name: Upload deployment folder
         uses: actions/upload-artifact@v4
         with:
           name: fitbit_qt-windows
-          path: fitbit_qt-windows.zip
+          path: deployment
