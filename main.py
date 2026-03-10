@@ -1,8 +1,7 @@
 from pathlib import Path
 import traceback
 
-import pandas as pd
-from PySide6.QtCore import QObject, QThread, Signal, Slot, QDate
+from PySide6.QtCore import QObject, QThread, Signal, Slot, QDate, QAbstractTableModel, Qt, QModelIndex
 from PySide6.QtWidgets import (
     QApplication,
     QCheckBox,
@@ -22,11 +21,83 @@ from PySide6.QtWidgets import (
 )
 
 from core.converter import convert_takeout_zip_bytes, sanitize_filename_part
-from ui.table_models import DataFrameModel
+
+
+ACTIVITY_COLUMNS = [
+    "Date",
+    "Calories Burned",
+    "Steps",
+    "Distance",
+    "Floors",
+    "Minutes Sedentary",
+    "Minutes Lightly Active",
+    "Minutes Fairly Active",
+    "Minutes Very Active",
+    "Activity Calories",
+]
+
+SLEEP_COLUMNS = [
+    "Start Time",
+    "End Time",
+    "Minutes Asleep",
+    "Minutes Awake",
+    "Number of Awakenings",
+    "Time in Bed",
+    "Minutes REM Sleep",
+    "Minutes Light Sleep",
+    "Minutes Deep Sleep",
+]
+
+
+class ListOfDictTableModel(QAbstractTableModel):
+    def __init__(self, rows=None, columns=None):
+        super().__init__()
+        self._rows = rows or []
+        self._columns = columns or []
+
+    def set_data(self, rows, columns=None):
+        self.beginResetModel()
+        self._rows = rows or []
+        if columns is not None:
+            self._columns = columns
+        self.endResetModel()
+
+    def rowCount(self, parent=QModelIndex()):
+        if parent.isValid():
+            return 0
+        return len(self._rows)
+
+    def columnCount(self, parent=QModelIndex()):
+        if parent.isValid():
+            return 0
+        return len(self._columns)
+
+    def data(self, index, role=Qt.DisplayRole):
+        if not index.isValid():
+            return None
+
+        if role == Qt.DisplayRole:
+            row = self._rows[index.row()]
+            col = self._columns[index.column()]
+            value = row.get(col, "")
+            return "" if value is None else str(value)
+
+        return None
+
+    def headerData(self, section, orientation, role=Qt.DisplayRole):
+        if role != Qt.DisplayRole:
+            return None
+
+        if orientation == Qt.Horizontal:
+            if 0 <= section < len(self._columns):
+                return self._columns[section]
+            return None
+
+        return str(section + 1)
 
 
 class Worker(QObject):
-    finished = Signal(object, object, object, object)  # csv_bytes, act_df, slp_df, dr
+    finished = Signal(object, object, object, object)  # csv_bytes, activity_rows, sleep_rows, date_range
     failed = Signal(str)
 
     def __init__(self, zip_path: str, participant_id: str, start_date, end_date, intersect_dates: bool):
@@ -41,13 +112,13 @@ class Worker(QObject):
     def run(self):
         try:
             zip_bytes = Path(self.zip_path).read_bytes()
-            out_bytes, act_df, slp_df, dr = convert_takeout_zip_bytes(
+            out_bytes, activity_rows, sleep_rows, date_range = convert_takeout_zip_bytes(
                 zip_bytes,
                 intersect_dates=self.intersect_dates,
-                user_start=pd.Timestamp(self.start_date),
-                user_end=pd.Timestamp(self.end_date),
+                user_start=self.start_date,
+                user_end=self.end_date,
             )
-            self.finished.emit(out_bytes, act_df, slp_df, dr)
+            self.finished.emit(out_bytes, activity_rows, sleep_rows, date_range)
         except Exception:
             self.failed.emit(traceback.format_exc())
 
@@ -61,6 +132,8 @@ class MainWindow(QMainWindow):
         self.zip_path = ""
         self.csv_bytes = None
         self.current_range = None
+        self.activity_rows = []
+        self.sleep_rows = []
 
         central = QWidget()
         self.setCentralWidget(central)
@@ -114,8 +187,8 @@ class MainWindow(QMainWindow):
         self.activity_table = QTableView()
         self.sleep_table = QTableView()
 
-        self.activity_model = DataFrameModel()
-        self.sleep_model = DataFrameModel()
+        self.activity_model = ListOfDictTableModel([], ACTIVITY_COLUMNS)
+        self.sleep_model = ListOfDictTableModel([], SLEEP_COLUMNS)
 
         self.activity_table.setModel(self.activity_model)
         self.sleep_table.setModel(self.sleep_model)
@@ -178,12 +251,14 @@ class MainWindow(QMainWindow):
 
         self.thread.start()
 
-    def on_finished(self, csv_bytes, act_df, slp_df, dr):
+    def on_finished(self, csv_bytes, activity_rows, sleep_rows, date_range):
         self.csv_bytes = csv_bytes
-        self.current_range = dr
+        self.current_range = date_range
+        self.activity_rows = activity_rows or []
+        self.sleep_rows = sleep_rows or []
 
-        self.activity_model.set_dataframe(act_df.head(50))
-        self.sleep_model.set_dataframe(slp_df.head(50))
+        self.activity_model.set_data(self.activity_rows[:50], ACTIVITY_COLUMNS)
+        self.sleep_model.set_data(self.sleep_rows[:50], SLEEP_COLUMNS)
 
         self.activity_table.resizeColumnsToContents()
         self.sleep_table.resizeColumnsToContents()
@@ -191,8 +266,8 @@ class MainWindow(QMainWindow):
         self.save_button.setEnabled(True)
         self.process_button.setEnabled(True)
 
-        if dr is not None:
-            self.status_label.setText(f"Done. Effective range: {dr[0]} to {dr[1]}")
+        if date_range is not None:
+            self.status_label.setText(f"Done. Effective range: {date_range[0]} to {date_range[1]}")
         else:
             self.status_label.setText("Done.")
 
