@@ -1,40 +1,48 @@
-import pandas as pd
 from PySide6.QtCore import QAbstractTableModel, QModelIndex, Qt
 
 
-class DataFrameModel(QAbstractTableModel):
-    def __init__(self, df: pd.DataFrame | None = None):
+class ListOfDictTableModel(QAbstractTableModel):
+    def __init__(self, rows=None, columns=None):
         super().__init__()
-        self._df = df.copy() if df is not None else pd.DataFrame()
+        self._rows = rows or []
+        self._columns = columns or []
 
-    def set_dataframe(self, df: pd.DataFrame) -> None:
+    def set_data(self, rows, columns=None):
         self.beginResetModel()
-        self._df = df.copy()
+        self._rows = rows or []
+        if columns is not None:
+            self._columns = columns
         self.endResetModel()
 
     def rowCount(self, parent=QModelIndex()):
         if parent.isValid():
             return 0
-        return len(self._df.index)
+        return len(self._rows)
 
     def columnCount(self, parent=QModelIndex()):
         if parent.isValid():
             return 0
-        return len(self._df.columns)
+        return len(self._columns)
 
     def data(self, index, role=Qt.DisplayRole):
         if not index.isValid():
             return None
+
         if role == Qt.DisplayRole:
-            value = self._df.iat[index.row(), index.column()]
-            if pd.isna(value):
-                return ""
-            return str(value)
+            row = self._rows[index.row()]
+            col = self._columns[index.column()]
+            value = row.get(col, "")
+            return "" if value is None else str(value)
+
         return None
 
     def headerData(self, section, orientation, role=Qt.DisplayRole):
         if role != Qt.DisplayRole:
             return None
+
         if orientation == Qt.Horizontal:
-            return str(self._df.columns[section])
+            if 0 <= section < len(self._columns):
+                return self._columns[section]
+            return None
+
         return str(section + 1)
