@@ -21,4 +21,23 @@ jobs:
           . .\.venv\Scripts\Activate.ps1
           python -m pip install --upgrade pip
           python -m pip install -r requirements.txt
-          pyside6-deploy -f
+          "Yes" | pyside6-deploy -f
+
+      - name: Show deployment files
+        shell: pwsh
+        run: |
+          Get-ChildItem -Recurse deployment
+
+      - name: Zip Windows build
+        shell: pwsh
+        run: |
+          $exe = Get-ChildItem -Recurse deployment -Filter *.exe | Select-Object -First 1
+          if (-not $exe) { throw "No packaged .exe found in deployment folder." }
+          $folder = Split-Path $exe.FullName -Parent
+          Compress-Archive -Path "$folder\*" -DestinationPath "fitbit_qt-windows.zip" -Force
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: fitbit_qt-windows
+          path: fitbit_qt-windows.zip
