@@ -23,13 +23,18 @@ jobs:
           python -m pip install -r requirements.txt
           "Yes" | pyside6-deploy -f
 
-      - name: Show deployment output
+      - name: Show generated files
         shell: pwsh
         run: |
-          Get-ChildItem -Recurse deployment
+          Get-ChildItem -Recurse .
 
-      - name: Upload deployment folder
+      - name: Zip Windows exe
+        shell: pwsh
+        run: |
+          Compress-Archive -Path "pyside_app_demo.exe" -DestinationPath "fitbit_qt-windows.zip" -Force
+
+      - name: Upload zipped artifact
         uses: actions/upload-artifact@v4
         with:
           name: fitbit_qt-windows
-          path: deployment
+          path: fitbit_qt-windows.zip
